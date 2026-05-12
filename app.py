@@ -213,6 +213,16 @@ def line_fig(df, title, yformat=None, colors=None, height=370):
     fig.update_layout(**lay)
     return fig
 
+OUTPUTS_DIR = Path(__file__).resolve().parent / "outputs"
+
+@st.cache_data(show_spinner=False)
+def load_headline_summary():
+    fp = OUTPUTS_DIR / "headline_summary.csv"
+    if fp.exists():
+        return pd.read_csv(fp, index_col=0)
+    return None
+
+headline_df = load_headline_summary()
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA LOADING (cached on path)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -948,16 +958,56 @@ with tabs[4]:
          "Modify sidebar parameters and metrics update immediately.")
 
     sh("Performance Scorecard")
-    disp = perf_sum.copy()
-    fp = lambda v: f"{v*100:.2f}%" if not np.isnan(v) else "—"
-    fn = lambda v: f"{v:.3f}"     if not np.isnan(v) else "—"
-    for c in ["Total Return","Ann Return","Ann Vol","Max Drawdown","Ann Turnover"]:
-        disp[c] = disp[c].apply(fp)
-    for c in ["Sharpe","Calmar"]:
-        disp[c] = disp[c].apply(fn)
-    st.dataframe(disp.style.set_properties(**{
-        "font-family":"IBM Plex Mono,monospace","font-size":"12px"}),
-        use_container_width=True)
+
+    fp = lambda v: f"{v*100:.2f}%" if pd.notna(v) else "—"
+    fn = lambda v: f"{v:.3f}" if pd.notna(v) else "—"
+    
+    if headline_df is not None:
+        disp = headline_df.copy()
+    
+        preferred_order = [
+            "Post-Phase-II Regime Optimized",
+            "Phase II Hand + Regime",
+            "60/40 Benchmark",
+            "Equal Weight",
+            "Risk Parity",
+            "Minimum Volatility",
+        ]
+    
+        ordered = [s for s in preferred_order if s in disp.index] + [
+            s for s in disp.index if s not in preferred_order
+        ]
+    
+        disp = disp.loc[ordered]
+    
+        for c in ["Total Return", "Ann Return", "Ann Vol", "Max Drawdown", "Ann Turnover"]:
+            if c in disp.columns:
+                disp[c] = disp[c].apply(fp)
+    
+        for c in ["Sharpe", "Calmar"]:
+            if c in disp.columns:
+                disp[c] = disp[c].apply(fn)
+    
+        st.success("Loaded scorecard from outputs/headline_summary.csv")
+    
+    else:
+        st.warning("headline_summary.csv not found in outputs folder. Showing live-computed dashboard values instead.")
+    
+        disp = perf_sum.copy()
+    
+        for c in ["Total Return", "Ann Return", "Ann Vol", "Max Drawdown", "Ann Turnover"]:
+            disp[c] = disp[c].apply(fp)
+    
+        for c in ["Sharpe", "Calmar"]:
+            disp[c] = disp[c].apply(fn)
+    
+    st.dataframe(
+        disp.style.set_properties(**{
+            "font-family": "IBM Plex Mono,monospace",
+            "font-size": "12px"
+        }),
+        use_container_width=True
+    )
 
     sh("Strategy Growth of $1")
     sel = st.multiselect("Select strategies to display",
