@@ -5,7 +5,7 @@ Bank of America | FA800 QWIM Project
 
 import warnings
 warnings.filterwarnings("ignore")
-
+from io import StringIO
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -248,7 +248,7 @@ def load_prices_cached(data_dir_str):
 @st.cache_data(show_spinner=False)
 def load_stress_cached(data_dir_str, ret_json):
     d = Path(data_dir_str)
-    returns = pd.read_json(ret_json)
+    returns = pd.read_json(StringIO(ret_json))
     returns.index = pd.to_datetime(returns.index)
     returns = returns.sort_index()
     idx_path = d / "indices_weekly.csv"
@@ -278,7 +278,7 @@ def load_stress_cached(data_dir_str, ret_json):
 
 @st.cache_data(show_spinner=False)
 def fit_regimes_cached(stress_json, model_name, n_states):
-    stress = pd.read_json(stress_json)
+    stress = pd.read_json(StringIO(stress_json))
     stress.index = pd.to_datetime(stress.index)
     stress = stress.sort_index()
     x = stress[["LSI","IRI"]].dropna().values
@@ -377,8 +377,8 @@ def _expanding(ret_df, mode, mt, tc, thr):
 
 @st.cache_data(show_spinner=False)
 def run_all_strategies(ret_json, reg_json, mt, tc, thr):
-    ret = pd.read_json(ret_json); ret.index = pd.to_datetime(ret.index); ret = ret.sort_index()
-    reg = pd.read_json(reg_json, typ="series"); reg.index = pd.to_datetime(reg.index)
+    ret = pd.read_json(StringIO(ret_json)); ret.index = pd.to_datetime(ret.index); ret = ret.sort_index()
+    reg = pd.read_json(StringIO(reg_json), typ="series"); reg.index = pd.to_datetime(reg.index)
     reg = reg.sort_index().astype(int)
     common  = ret.index.intersection(reg.index)
     rc, gc  = ret.loc[common], reg.loc[common]
@@ -546,17 +546,17 @@ returns = prices.pct_change().dropna()
 
 with st.spinner("Building stress indices…"):
     stress_json, stress_src = load_stress_cached(data_dir_input, returns.to_json())
-    stress = pd.read_json(stress_json)
+    stress = pd.read_json(StringIO(stress_json))
     stress.index = pd.to_datetime(stress.index)
     stress = stress.sort_index()
 
 with st.spinner(f"Fitting {model_choice} ({n_regimes} regimes)…"):
     reg_json, prob_json, model_used = fit_regimes_cached(
         stress_json, model_choice, n_regimes)
-    regimes  = pd.read_json(reg_json, typ="series")
+    regimes  = pd.read_json(StringIO(reg_json), typ="series")
     regimes.index = pd.to_datetime(regimes.index)
     regimes  = regimes.sort_index().astype(int)
-    prob_df  = pd.read_json(prob_json)
+    prob_df  = pd.read_json(StringIO(prob_json))
     prob_df.index = pd.to_datetime(prob_df.index)
     prob_df  = prob_df.sort_index()
 
@@ -574,11 +574,11 @@ latest_date     = regimes.index[-1].strftime("%B %d, %Y")
 with st.spinner("Running portfolio backtests…"):
     sr_j, st_j, hw_j, rp_j, mv_j = run_all_strategies(
         returns.to_json(), reg_json, min_train, tc_bps, threshold)
-    strat_r  = pd.read_json(sr_j); strat_r.index  = pd.to_datetime(strat_r.index);  strat_r  = strat_r.sort_index()
-    strat_t  = pd.read_json(st_j); strat_t.index  = pd.to_datetime(strat_t.index);  strat_t  = strat_t.sort_index()
-    hw_wts   = pd.read_json(hw_j); hw_wts.index   = pd.to_datetime(hw_wts.index);   hw_wts   = hw_wts.sort_index()
-    rp_wts   = pd.read_json(rp_j); rp_wts.index   = pd.to_datetime(rp_wts.index);   rp_wts   = rp_wts.sort_index()
-    mv_wts   = pd.read_json(mv_j); mv_wts.index   = pd.to_datetime(mv_wts.index);   mv_wts   = mv_wts.sort_index()
+    strat_r  = pd.read_json(StringIO(sr_j)); strat_r.index  = pd.to_datetime(strat_r.index);  strat_r  = strat_r.sort_index()
+    strat_t  = pd.read_json(StringIO(st_j)); strat_t.index  = pd.to_datetime(strat_t.index);  strat_t  = strat_t.sort_index()
+    hw_wts   = pd.read_json(StringIO(hw_j)); hw_wts.index   = pd.to_datetime(hw_wts.index);   hw_wts   = hw_wts.sort_index()
+    rp_wts   = pd.read_json(StringIO(rp_j)); rp_wts.index   = pd.to_datetime(rp_wts.index);   rp_wts   = rp_wts.sort_index()
+    mv_wts   = pd.read_json(StringIO(mv_j)); mv_wts.index   = pd.to_datetime(mv_wts.index);   mv_wts   = mv_wts.sort_index()
 
 strat_growth = (1 + strat_r).cumprod()
 strat_dd     = strat_growth / strat_growth.cummax() - 1
